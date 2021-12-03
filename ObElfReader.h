@@ -29,7 +29,10 @@ public:
 //    void GetDynamicSection(Elf_Dyn** dynamic, size_t* dynamic_count, Elf_Word* dynamic_flags) override;
     bool haveDynamicSectionInLoadableSegment();
 
+protected:
+    virtual bool TryFixElfHeader();
 private:
+    
     void ApplyDynamicSection();
 
     Elf_Addr dump_so_base_ = 0;

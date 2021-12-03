@@ -40,6 +40,7 @@ public:
 protected:
     bool ReadElfHeader();
     bool VerifyElfHeader();
+    virtual bool TryFixElfHeader();
     bool ReadProgramHeader();
     bool ReserveAddressSpace(uint32_t padding_size = 0);
     bool LoadSegments();

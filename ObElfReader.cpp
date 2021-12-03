@@ -48,9 +48,24 @@ void ObElfReader::FixDumpSoPhdr() {
     }
 }
 
+bool ObElfReader::TryFixElfHeader(){
+    FLOGE("TRY FIX");
+    ElfReader base_reader;
+
+    // if base so is provided, load dynamic section from base so
+    if (!base_reader.setSource(baseso_) ||
+        !base_reader.ReadElfHeader() ||
+        !base_reader.VerifyElfHeader() ) {
+        FLOGE("[try_fix] Unable to parse base so file, is it correct?");
+        return false;
+    }
+
+    header_ = base_reader.header_;
+    return true;
+}
 bool ObElfReader::Load() {
     // try open
-    if (!ReadElfHeader() || !VerifyElfHeader() || !ReadProgramHeader())
+    if (!ReadElfHeader() || !(VerifyElfHeader() || TryFixElfHeader()) || !ReadProgramHeader())
         return false;
     FixDumpSoPhdr();
 

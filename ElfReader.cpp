@@ -120,7 +120,7 @@ ElfReader::~ElfReader() {
 bool ElfReader::Load() {
     // try open
     return ReadElfHeader() &&
-           VerifyElfHeader() &&
+           (VerifyElfHeader() || TryFixElfHeader()) &&
            ReadProgramHeader() &&
            // TODO READ dynamic from SECTION header (>= __ANDROID_API_O__)
            ReserveAddressSpace() &&
@@ -174,6 +174,8 @@ bool ElfReader::VerifyElfHeader() {
 
     return true;
 }
+
+bool ElfReader::TryFixElfHeader(){}
 
 // Loads the program header table from an ELF file into a read-only private
 // anonymous mmap-ed block.

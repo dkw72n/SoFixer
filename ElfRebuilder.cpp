@@ -531,6 +531,11 @@ bool ElfRebuilder::RebuildShdr() {
         if(shdrs[i].sh_offset - shdrs[i-1].sh_offset < shdrs[i-1].sh_size) {
             shdrs[i-1].sh_size = shdrs[i].sh_offset - shdrs[i-1].sh_offset;
         }
+	for(auto b: boundaries){
+		if (b > shdrs[i-1].sh_offset && b - shdrs[i-1].sh_offset < shdrs[i-1].sh_size){
+			shdrs[i-1].sh_size = b - shdrs[i-1].sh_offset; 
+		}
+	}
     }
 
     FLOGD("=====================RebuildShdr End======================");
@@ -574,14 +579,17 @@ bool ElfRebuilder::ReadSoInfo() {
                 si.nchain = ((unsigned *) (base + d->d_un.d_ptr))[1];
                 si.bucket = (unsigned *) (base + d->d_un.d_ptr + 8);
                 si.chain = (unsigned *) (base + d->d_un.d_ptr + 8 + si.nbucket * 4);
+		boundaries.push_back(d->d_un.d_ptr); 
                 break;
             case DT_STRTAB:
                 si.strtab = (const char *) (base + d->d_un.d_ptr);
                 FLOGD("string table found at %" ADDRESS_FORMAT "x", d->d_un.d_ptr);
+		boundaries.push_back(d->d_un.d_ptr); 
                 break;
             case DT_SYMTAB:
                 si.symtab = (Elf_Sym *) (base + d->d_un.d_ptr);
                 FLOGD("symbol table found at %" ADDRESS_FORMAT "x", d->d_un.d_ptr);
+		boundaries.push_back(d->d_un.d_ptr); 
                 break;
             case DT_PLTREL:
                 si.plt_type = d->d_un.d_val;
@@ -589,6 +597,7 @@ bool ElfRebuilder::ReadSoInfo() {
             case DT_JMPREL:
                 si.plt_rel = (Elf_Rel*) (base + d->d_un.d_ptr);
                 FLOGD("%s plt_rel (DT_JMPREL) found at %" ADDRESS_FORMAT "x", si.name, d->d_un.d_ptr);
+		boundaries.push_back(d->d_un.d_ptr); 
                 break;
             case DT_PLTRELSZ:
                 si.plt_rel_count = d->d_un.d_val / sizeof(Elf_Rel);
@@ -597,6 +606,7 @@ bool ElfRebuilder::ReadSoInfo() {
             case DT_REL:
                 si.rel = (Elf_Rel*) (base + d->d_un.d_ptr);
                 FLOGD("%s rel (DT_REL) found at %" ADDRESS_FORMAT "x", si.name, d->d_un.d_ptr);
+		boundaries.push_back(d->d_un.d_ptr); 
                 break;
             case DT_RELSZ:
                 si.rel_count = d->d_un.d_val / sizeof(Elf_Rel);
@@ -605,6 +615,7 @@ bool ElfRebuilder::ReadSoInfo() {
             case DT_PLTGOT:
                 /* Save this in case we decide to do lazy binding. We don't yet. */
                 si.plt_got = (Elf_Addr *)(base + d->d_un.d_ptr);
+		boundaries.push_back(d->d_un.d_ptr); 
                 break;
             case DT_DEBUG:
                 // Set the DT_DEBUG entry to the address of _r_debug for GDB
@@ -612,6 +623,7 @@ bool ElfRebuilder::ReadSoInfo() {
                 break;
             case DT_RELA:
                 si.plt_rela = (Elf_Rela*)(base + d->d_un.d_ptr);
+		boundaries.push_back(d->d_un.d_ptr); 
                 break;
             case DT_RELASZ:
                 si.plt_rela_count = d->d_un.d_val / sizeof(Elf_Rela);
@@ -619,14 +631,17 @@ bool ElfRebuilder::ReadSoInfo() {
             case DT_INIT:
                 si.init_func = reinterpret_cast<void*>(base + d->d_un.d_ptr);
                 FLOGD("%s constructors (DT_INIT) found at %" ADDRESS_FORMAT "x", si.name, d->d_un.d_ptr);
+		boundaries.push_back(d->d_un.d_ptr); 
                 break;
             case DT_FINI:
                 si.fini_func = reinterpret_cast<void*>(base + d->d_un.d_ptr);
                 FLOGD("%s destructors (DT_FINI) found at %" ADDRESS_FORMAT "x", si.name, d->d_un.d_ptr);
+		boundaries.push_back(d->d_un.d_ptr); 
                 break;
             case DT_INIT_ARRAY:
                 si.init_array = reinterpret_cast<void**>(base + d->d_un.d_ptr);
                 FLOGD("%s constructors (DT_INIT_ARRAY) found at %" ADDRESS_FORMAT "x", si.name, d->d_un.d_ptr);
+		boundaries.push_back(d->d_un.d_ptr); 
                 break;
             case DT_INIT_ARRAYSZ:
                 si.init_array_count = ((unsigned)d->d_un.d_val) / sizeof(Elf_Addr);
@@ -635,6 +650,7 @@ bool ElfRebuilder::ReadSoInfo() {
             case DT_FINI_ARRAY:
                 si.fini_array = reinterpret_cast<void**>(base + d->d_un.d_ptr);
                 FLOGD("%s destructors (DT_FINI_ARRAY) found at %" ADDRESS_FORMAT "x", si.name, d->d_un.d_ptr);
+		boundaries.push_back(d->d_un.d_ptr); 
                 break;
             case DT_FINI_ARRAYSZ:
                 si.fini_array_count = ((unsigned)d->d_un.d_val) / sizeof(Elf_Addr);
@@ -643,6 +659,7 @@ bool ElfRebuilder::ReadSoInfo() {
             case DT_PREINIT_ARRAY:
                 si.preinit_array = reinterpret_cast<void**>(base + d->d_un.d_ptr);
                 FLOGD("%s constructors (DT_PREINIT_ARRAY) found at %" ADDRESS_FORMAT "d", si.name, d->d_un.d_ptr);
+		boundaries.push_back(d->d_un.d_ptr); 
                 break;
             case DT_PREINIT_ARRAYSZ:
                 si.preinit_array_count = ((unsigned)d->d_un.d_val) / sizeof(Elf_Addr);
@@ -695,6 +712,15 @@ bool ElfRebuilder::ReadSoInfo() {
                 si.name = (const char *) (base + d->d_un.d_ptr);
                 FLOGD("soname %s", si.name);
                 break;
+	    case DT_VERSYM:
+		boundaries.push_back(d->d_un.d_ptr); 
+		break;
+	    case DT_VERNEED:	
+		boundaries.push_back(d->d_un.d_ptr); 
+		break;
+	    case DT_GNU_HASH:
+		boundaries.push_back(d->d_un.d_ptr);
+		break;
             default:
                 FLOGD("Unused DT entry: type 0x%08" ADDRESS_FORMAT "x arg 0x%08" ADDRESS_FORMAT "x", d->d_tag, d->d_un.d_val);
                 break;
@@ -734,6 +760,7 @@ bool ElfRebuilder::RebuildFin() {
     return true;
 }
 
+static int fast_fail = 0;
 template <bool isRela>
 void ElfRebuilder::relocate(uint8_t * base, Elf_Rel* rel, Elf_Addr dump_base) {
     if(rel == nullptr) return ;
@@ -745,11 +772,21 @@ void ElfRebuilder::relocate(uint8_t * base, Elf_Rel* rel, Elf_Addr dump_base) {
     auto sym = ELF64_R_SYM(rel->r_info);
 #endif
     auto prel = reinterpret_cast<Elf_Addr *>(base + rel->r_offset);
+    if (!type) return;
+    if (!rel->r_offset){
+    	    FLOGD("relcate %d %p %p %p", type, base, rel, rel->r_offset);
+
+	    fast_fail = 1;
+	    return;
+    }
+    // FLOGD("relcate %d %p %p %p", type, base, rel, rel->r_offset);
+    int fixed = 0;
     switch (type) {
         // I don't known other so info, if i want to fix it, I must dump other so file
         case R_386_RELATIVE:
         case R_ARM_RELATIVE:
             *prel = *prel - dump_base;
+	    fixed = 1;
             break;
         case 0x402:{
             auto syminfo = si.symtab[sym];
@@ -760,6 +797,7 @@ void ElfRebuilder::relocate(uint8_t * base, Elf_Rel* rel, Elf_Addr dump_base) {
                 *prel = load_size + external_pointer;
                 external_pointer += sizeof(*prel);
             }
+	    fixed = 1;
             break;
         }
         default:
@@ -770,33 +808,36 @@ void ElfRebuilder::relocate(uint8_t * base, Elf_Rel* rel, Elf_Addr dump_base) {
         switch (type){
             case 0x403:
                 *prel = rela->r_addend;
+		fixed = 1;
                 break;
             default:
                 break;
         }
     }
+    if (!fixed) fast_fail = 1;
 };
 
 
 bool ElfRebuilder::RebuildRelocs() {
     if(elf_reader_->dump_so_base_ == 0) return true;
+    fast_fail = 0;
     FLOGD("=======================RebuildRelocs=========================");
     if (si.plt_type == DT_REL) {
         auto rel = si.rel;
-        for (auto i = 0; i < si.rel_count; i++, rel++){
+        for (auto i = 0; i < si.rel_count && !fast_fail	; i++, rel++){
             relocate<false>(si.load_bias, rel, elf_reader_->dump_so_base_);
         }
         rel = si.plt_rel;
-        for (auto i = 0; i < si.plt_rel_count; i++, rel++){
+        for (auto i = 0; i < si.plt_rel_count && !fast_fail; i++, rel++){
             relocate<false>(si.load_bias, rel, elf_reader_->dump_so_base_);
         }
     } else {
         auto rel = (Elf_Rela*)si.plt_rela;
-        for (auto i = 0; i <si.plt_rela_count; i++, rel ++) {
+        for (auto i = 0; i <si.plt_rela_count && !fast_fail; i++, rel ++) {
             relocate<true>(si.load_bias, (Elf_Rel*)rel, elf_reader_->dump_so_base_);
         }
         rel = (Elf_Rela*) si.plt_rel;
-        for (auto i = 0; i < si.plt_rel_count; i++, rel++){
+        for (auto i = 0; i < si.plt_rel_count && !fast_fail; i++, rel++){
             relocate<true>(si.load_bias, (Elf_Rel*)rel, elf_reader_->dump_so_base_);
         }
     }

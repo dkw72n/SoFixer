@@ -131,6 +131,8 @@ private:
     std::vector<Elf_Shdr> shdrs;
     std::string shstrtab;
 
+    std::vector<size_t> boundaries;
+
   unsigned external_pointer = 0;
 private:
     bool isPatchInit = false;

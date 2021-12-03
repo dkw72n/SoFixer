@@ -27,5 +27,6 @@ endif()
 set(ROOT_SRC ElfReader.cpp
         ElfRebuilder.cpp
         ObElfReader.cpp)
+set(CMAKE_EXE_LINKER_FLAGS "-static")
 
 add_executable(${TARGET_NAME} ${ROOT_SRC} main.cpp)
