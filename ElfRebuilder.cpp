@@ -600,8 +600,8 @@ bool ElfRebuilder::ReadSoInfo() {
 		boundaries.push_back(d->d_un.d_ptr); 
                 break;
             case DT_PLTRELSZ:
-                si.plt_rel_count = d->d_un.d_val / sizeof(Elf_Rel);
-                FLOGD("%s plt_rel_count (DT_PLTRELSZ) %zu", si.name, si.plt_rel_count);
+                si.plt_rel_size = d->d_un.d_val;
+                FLOGD("%s plt_rel_size (DT_PLTRELSZ) %zu", si.name, si.plt_rel_size);
                 break;
             case DT_REL:
                 si.rel = (Elf_Rel*) (base + d->d_un.d_ptr);
@@ -726,6 +726,13 @@ bool ElfRebuilder::ReadSoInfo() {
                 break;
         }
     }
+    if (si.plt_type == DT_REL){
+	    si.plt_rel_count = si.plt_rel_size / sizeof(Elf_Rel);
+	    FLOGD("[-] plt_type == DT_REL: plt_count = %d", si.plt_rel_count);
+    } else if (si.plt_type == DT_RELA){
+	    si.plt_rel_count = si.plt_rel_size / sizeof(Elf_Rela);
+	    FLOGD("[-] plt_type == DT_RELA: plt_count = %d", si.plt_rel_count);
+    }
     FLOGD("=======================ReadSoInfo End=========================");
     return true;
 }
@@ -760,6 +767,14 @@ bool ElfRebuilder::RebuildFin() {
     return true;
 }
 
+#ifndef  R_AARCH64_JUMP_SLOT 
+#define  R_AARCH64_JUMP_SLOT 1026
+#endif
+
+#ifndef R_AARCH64_RELATIVE
+#define R_AARCH64_RELATIVE 1027
+#endif
+
 static int fast_fail = 0;
 template <bool isRela>
 void ElfRebuilder::relocate(uint8_t * base, Elf_Rel* rel, Elf_Addr dump_base) {
@@ -788,7 +803,8 @@ void ElfRebuilder::relocate(uint8_t * base, Elf_Rel* rel, Elf_Addr dump_base) {
             *prel = *prel - dump_base;
 	    fixed = 1;
             break;
-        case 0x402:{
+        case R_AARCH64_JUMP_SLOT:{
+	    // FLOGD("[before] fix plt_rela jump slot sym:%d addr:%p prel=%p", sym, rel->r_offset, *(void**)prel);
             auto syminfo = si.symtab[sym];
             if (syminfo.st_value != 0) {
                 *prel = syminfo.st_value;
@@ -797,6 +813,7 @@ void ElfRebuilder::relocate(uint8_t * base, Elf_Rel* rel, Elf_Addr dump_base) {
                 *prel = load_size + external_pointer;
                 external_pointer += sizeof(*prel);
             }
+	    // FLOGD("[after ] fix plt_rela jump slot sym:%d addr:%p prel=%p", sym, rel->r_offset, *(void**)prel);
 	    fixed = 1;
             break;
         }
@@ -819,25 +836,29 @@ void ElfRebuilder::relocate(uint8_t * base, Elf_Rel* rel, Elf_Addr dump_base) {
 
 
 bool ElfRebuilder::RebuildRelocs() {
+    int i;
     if(elf_reader_->dump_so_base_ == 0) return true;
     fast_fail = 0;
     FLOGD("=======================RebuildRelocs=========================");
     if (si.plt_type == DT_REL) {
+	
         auto rel = si.rel;
-        for (auto i = 0; i < si.rel_count && !fast_fail	; i++, rel++){
+        for (i = 0; i < si.rel_count && !fast_fail	; i++, rel++){
             relocate<false>(si.load_bias, rel, elf_reader_->dump_so_base_);
         }
         rel = si.plt_rel;
-        for (auto i = 0; i < si.plt_rel_count && !fast_fail; i++, rel++){
+	auto end = &rel[si.plt_rel_count];
+        for (i = 0; rel < end; i++, rel++){
             relocate<false>(si.load_bias, rel, elf_reader_->dump_so_base_);
         }
     } else {
         auto rel = (Elf_Rela*)si.plt_rela;
-        for (auto i = 0; i <si.plt_rela_count && !fast_fail; i++, rel ++) {
+        for (i = 0; i <si.plt_rela_count && !fast_fail; i++, rel ++) {
             relocate<true>(si.load_bias, (Elf_Rel*)rel, elf_reader_->dump_so_base_);
         }
         rel = (Elf_Rela*) si.plt_rel;
-        for (auto i = 0; i < si.plt_rel_count && !fast_fail; i++, rel++){
+	auto end = &rel[si.plt_rel_count];
+        for (i = 0; rel < end; i++, rel++){
             relocate<true>(si.load_bias, (Elf_Rel*)rel, elf_reader_->dump_so_base_);
         }
     }
@@ -847,6 +868,8 @@ bool ElfRebuilder::RebuildRelocs() {
     };
 //        relocate_address(p, elf_reader_->dump_so_base_);
 //        relocate_address(p, elf_reader_->dump_so_base_);
+    for (i = 0; i < si.fini_array_count; i++){
+    }
     FLOGD("=======================RebuildRelocs End=======================");
     return true;
 }

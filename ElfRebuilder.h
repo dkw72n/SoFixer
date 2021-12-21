@@ -56,6 +56,7 @@ public:
     Elf_Rel* plt_rel = nullptr;
     size_t plt_rel_count = 0;
     Elf_Rela* plt_rela = nullptr;
+    size_t plt_rel_size = 0;
     size_t plt_rela_count = 0;
 
     Elf_Rel* rel = nullptr;
