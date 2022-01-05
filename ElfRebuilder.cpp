@@ -184,25 +184,26 @@ bool ElfRebuilder::RebuildShdr() {
         }
         shstrtab.push_back('\0');
 
-        shdr.sh_type = SHT_REL;
         shdr.sh_flags = SHF_ALLOC;
         shdr.sh_addr = (uintptr_t)si.plt_rel - (uintptr_t)base;
         shdr.sh_offset = shdr.sh_addr;
         if (si.plt_type == DT_REL){
+            shdr.sh_type = SHT_REL;
             shdr.sh_size = si.plt_rel_count * sizeof(Elf_Rel);
+	    shdr.sh_entsize = sizeof(Elf_Rel);
         }else {
+            shdr.sh_type = SHT_RELA;
             shdr.sh_size = si.plt_rel_count * sizeof(Elf_Rela);
+	    shdr.sh_entsize = sizeof(Elf_Rela);
         }
         shdr.sh_link = sDYNSYM;
         shdr.sh_info = 0;
 #ifdef __SO64__
         shdr.sh_addralign = 8;
-        shdr.sh_entsize = 0x18;
 #else
         shdr.sh_addralign = 4;
-        shdr.sh_entsize = 0x8;
 #endif
-
+	// FLOGD("entsize=%d", shdr.sh_entsize);
         shdrs.push_back(shdr);
     }
 
@@ -556,6 +557,7 @@ bool ElfRebuilder::ReadSoInfo() {
     si.phdr = elf_reader_->loaded_phdr();
     si.phnum = elf_reader_->phdr_count();
     auto base = si.load_bias;
+    FLOGD("base = %p", base);
     phdr_table_get_load_size(si.phdr, si.phnum, &si.min_load, &si.max_load);
     si.max_load += elf_reader_->pad_size_;
 
@@ -789,8 +791,7 @@ void ElfRebuilder::relocate(uint8_t * base, Elf_Rel* rel, Elf_Addr dump_base) {
     auto prel = reinterpret_cast<Elf_Addr *>(base + rel->r_offset);
     if (!type) return;
     if (!rel->r_offset){
-    	    FLOGD("relcate %d %p %p %p", type, base, rel, rel->r_offset);
-
+    	    // FLOGD("relcate %d %p %p %p", type, base, rel, rel->r_offset);
 	    fast_fail = 1;
 	    return;
     }

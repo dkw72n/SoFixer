@@ -277,6 +277,7 @@ bool ElfReader::ReserveAddressSpace(uint32_t padding_size) {
     memset(start, 0, alloc_size);
 
     load_start_ = start;
+    FLOGD("load_start=%p addr=%p", start, addr);
     // the first loaded phdr data should be loaded in the start of load_start
     // (load_bias_ + phdr.vaddr), so load_bias_ = load_start - phdr.vaddr(min_addr)
     load_bias_ = reinterpret_cast<uint8_t *>(reinterpret_cast<uintptr_t >(start)
